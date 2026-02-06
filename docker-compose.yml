@@ -1,0 +1,73 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: gold-tracker-db
+    environment:
+      POSTGRES_USER: goldtracker
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-devpassword}
+      POSTGRES_DB: goldtracker
+    volumes:
+      - gold_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goldtracker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: gold-tracker-api
+    environment:
+      DATABASE_URL: postgresql://goldtracker:${DB_PASSWORD:-devpassword}@db:5432/goldtracker
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./api/src:/app/src
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Telegram Scraper
+  scraper:
+    build:
+      context: ./scraper
+      dockerfile: Dockerfile
+    container_name: gold-tracker-scraper
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+      TELEGRAM_PHONE: ${TELEGRAM_PHONE}
+      DATABASE_URL: postgresql://goldtracker:${DB_PASSWORD:-devpassword}@db:5432/goldtracker
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./scraper/src:/app/src
+      - scraper_sessions:/app/sessions
+
+  # Next.js Frontend
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: gold-tracker-web
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    volumes:
+      - ./web/src:/app/src
+      - ./web/public:/app/public
+    depends_on:
+      - api
+
+volumes:
+  gold_data:
+  scraper_sessions:
