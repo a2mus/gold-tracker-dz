@@ -2,37 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
-
-:root {
-  --gold-gradient: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-body {
-  font-family: 'Cairo', sans-serif;
-  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-  min-height: 100vh;
+::-webkit-scrollbar-track {
+  background: #111;
 }
 
-.gold-gradient {
-  background: var(--gold-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
 }
 
-.card {
-  @apply bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-6;
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
 }
 
-.price-up {
-  @apply text-emerald-400;
+.glass-effect {
+  background: rgba(26, 26, 26, 0.7);
+  backdrop-filter: blur(10px);
 }
 
-.price-down {
-  @apply text-red-400;
+.gauge-container {
+  position: relative;
+  width: 150px;
+  height: 75px;
+  overflow: hidden;
 }
 
-.glow-gold {
-  box-shadow: 0 0 40px rgba(251, 191, 36, 0.15);
+.gauge-bg {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: conic-gradient(from 180deg, #EF4444 0deg, #F59E0B 90deg, #10B981 180deg);
+  position: absolute;
+  top: 0;
+  left: 0;
+  mask-image: radial-gradient(transparent 60%, black 61%);
+  -webkit-mask-image: radial-gradient(transparent 60%, black 61%);
+  transform: rotate(180deg);
+}
+
+.gauge-needle {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 4px;
+  height: 70px;
+  background: #fff;
+  transform-origin: bottom center;
+  transform: rotate(45deg);
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  transition: transform 1s ease-out;
+}
+
+.gauge-needle::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: -5px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
 }

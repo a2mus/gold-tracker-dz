@@ -1,16 +1,13 @@
 import type { Metadata } from 'next'
+import { Inter, Tajawal } from 'next/font/google'
 import './globals.css'
 
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+const tajawal = Tajawal({ subsets: ['arabic'], weight: ['400', '500', '700'], variable: '--font-tajawal' })
+
 export const metadata: Metadata = {
-  title: 'Gold Tracker Algeria | أسعار الذهب في الجزائر',
-  description: 'تتبع أسعار الذهب في الجزائر في الوقت الفعلي - 18k, 21k, 22k, 24k | Real-time gold prices in Algeria',
-  keywords: ['gold', 'algeria', 'prix or', 'ذهب', 'الجزائر', 'سعر الذهب', 'sabika', 'سبيكة'],
-  openGraph: {
-    title: 'Gold Tracker Algeria',
-    description: 'أسعار الذهب في الجزائر',
-    locale: 'ar_DZ',
-    type: 'website',
-  },
+  title: 'Gold Intelligence DZ - Tableau de Bord',
+  description: 'Tableau de bord intelligent pour le suivi des cours de l\'or en Algérie et dans le monde.',
 }
 
 export default function RootLayout({
@@ -19,8 +16,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ar" dir="rtl">
-      <body className="antialiased">
+    <html lang="fr" dir="ltr" className="dark">
+      <body className={`${inter.variable} ${tajawal.variable} bg-background-light dark:bg-background-dark text-gray-900 dark:text-gray-100 font-display min-h-screen flex flex-col antialiased transition-colors duration-300`}>
         {children}
       </body>
     </html>
