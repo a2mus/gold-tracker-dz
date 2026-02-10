@@ -14,11 +14,23 @@ import {
   Diamond, 
   Coins, 
   PiggyBank, 
-  Globe 
+  Globe,
+  AlertCircle
 } from 'lucide-react';
 import { AreaChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
-// Data for the chart
+// Types for API data
+interface GoldPrice {
+  karat: number;
+  current_price: number;
+  change_24h: number;
+  change_percent: number;
+  high_24h: number;
+  low_24h: number;
+  last_updated: string;
+}
+
+// Mock chart data (will be replaced with real historical data later)
 const chartData = [
   { name: 'Nov 01', local: 20000, global: 19000 },
   { name: 'Nov 05', local: 20200, global: 19200 },
@@ -31,6 +43,9 @@ const chartData = [
 
 export default function Dashboard() {
   const [needleRotation, setNeedleRotation] = useState(45);
+  const [prices, setPrices] = useState<GoldPrice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Animate needle on mount
@@ -39,6 +54,39 @@ export default function Dashboard() {
     }, 500);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    // Fetch prices from API
+    async function fetchPrices() {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${apiUrl}/api/v1/prices/current`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setPrices(data);
+        setLoading(false);
+      } catch (err) {
+        console.error('Failed to fetch prices:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load prices');
+        setLoading(false);
+      }
+    }
+
+    fetchPrices();
+    
+    // Refresh every 60 seconds
+    const interval = setInterval(fetchPrices, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Format price for display
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('fr-DZ').format(price);
+  };
 
   return (
     <div className="bg-background-light dark:bg-background-dark text-gray-900 dark:text-gray-100 font-display min-h-screen flex flex-col antialiased transition-colors duration-300">
@@ -86,7 +134,7 @@ export default function Dashboard() {
               <h2 className="font-semibold text-sm uppercase tracking-wider text-text-muted-light dark:text-text-muted-dark flex items-center gap-2">
                 <Newspaper className="text-primary text-base w-5 h-5" /> Actualités du Marché
               </h2>
-              <span className="h-2 w-2 bg-secondary rounded-full animate-ping"></span>
+              <span className="h-2 w-2 bg-secondary rounded-full animate-pulse"></span>
             </div>
             <div className="space-y-4 overflow-y-auto max-h-[800px] pr-2">
               <NewsItem 
@@ -139,6 +187,26 @@ export default function Dashboard() {
 
         {/* Main Content */}
         <div className="lg:col-span-9 space-y-6">
+          {/* Loading / Error State */}
+          {loading && (
+            <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-8 border border-border-light dark:border-border-dark text-center">
+              <div className="animate-pulse flex flex-col items-center gap-4">
+                <div className="h-12 w-12 rounded-full bg-primary/20"></div>
+                <p className="text-text-muted-light dark:text-text-muted-dark">Chargement des prix...</p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border border-red-200 dark:border-red-800 flex items-center gap-3">
+              <AlertCircle className="text-red-500 w-5 h-5" />
+              <div>
+                <p className="font-semibold text-red-700 dark:text-red-400">Erreur de chargement</p>
+                <p className="text-sm text-red-600 dark:text-red-300">{error}</p>
+              </div>
+            </div>
+          )}
+
           {/* AI Analysis Section */}
           <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-6 border border-border-light dark:border-border-dark shadow-sm relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full filter blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
@@ -201,76 +269,26 @@ export default function Dashboard() {
                 <thead>
                   <tr className="bg-background-light dark:bg-black/20 text-xs uppercase text-text-muted-light dark:text-text-muted-dark font-medium border-b border-border-light dark:border-border-dark">
                     <th className="p-4 font-semibold">Produit / Type</th>
-                    <th className="p-4 font-semibold text-right">Prix Moyen (DA)</th>
-                    <th className="p-4 font-semibold text-center">Tendance (1g)</th>
+                    <th className="p-4 font-semibold text-right">Prix Actuel (DA)</th>
+                    <th className="p-4 font-semibold text-center">Variation 24h</th>
                     <th className="p-4 font-semibold text-right">Var. %</th>
                     <th className="p-4 font-semibold text-center">Statut</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm divide-y divide-border-light dark:divide-border-dark">
-                  <TableRow 
-                    icon={<Hammer className="text-lg w-5 h-5" />} 
-                    color="text-yellow-500" 
-                    bg="bg-yellow-900/30"
-                    title="Or Cassé (Local)" 
-                    subtitle="18 Carats - Occasion" 
-                    price="12,250" 
-                    change="+0.85%" 
-                    status="Haussier" 
-                    trendColor="stroke-secondary"
-                  />
-                  <TableRow 
-                    icon={<Diamond className="text-lg w-5 h-5" />} 
-                    color="text-blue-400" 
-                    bg="bg-blue-900/30"
-                    title="Importé (Italien)" 
-                    subtitle="18 Carats - Neuf" 
-                    price="14,300" 
-                    change="0.00%" 
-                    status="Stable" 
-                    trendColor="stroke-gray-500"
-                    trendPath="M0,15 L100,15"
-                    statusColor="text-yellow-500 bg-yellow-500/10 border-yellow-500/20"
-                    changeColor="text-gray-500"
-                  />
-                  <TableRow 
-                    icon={<Crown className="text-lg w-5 h-5" />} 
-                    color="text-orange-400" 
-                    bg="bg-orange-900/30"
-                    title="Local (Algérien)" 
-                    subtitle="21 Carats - Artisanal" 
-                    price="15,800" 
-                    change="+1.15%" 
-                    status="Actif" 
-                    trendColor="stroke-secondary"
-                  />
-                  <TableRow 
-                    icon={<Coins className="text-lg w-5 h-5" />} 
-                    color="text-purple-400" 
-                    bg="bg-purple-900/30"
-                    title="Louis d'Or" 
-                    subtitle="22 Carats - Pièce" 
-                    price="68,500" 
-                    change="-0.44%" 
-                    status="Baisse" 
-                    trendColor="stroke-danger"
-                    trendPath="M0,5 C20,5 40,10 60,20 C80,25 90,28 100,28"
-                    statusColor="text-danger bg-danger/10 border-danger/20"
-                    changeColor="text-danger"
-                  />
-                  <TableRow 
-                    icon={<PiggyBank className="text-lg w-5 h-5" />} 
-                    color="text-amber-500" 
-                    bg="bg-amber-900/30"
-                    title="Lingot (Bullion)" 
-                    subtitle="24 Carats - Brut" 
-                    price="18,100" 
-                    change="+2.2%" 
-                    status="Forte Demande" 
-                    trendColor="stroke-primary"
-                    statusColor="text-primary bg-primary/10 border-primary/20"
-                    changeColor="text-primary"
-                  />
+                  {prices.length > 0 ? (
+                    prices.map((price) => (
+                      <PriceRow key={price.karat} price={price} formatPrice={formatPrice} />
+                    ))
+                  ) : (
+                    !loading && (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-text-muted-light dark:text-text-muted-dark">
+                          Aucune donnée disponible. Vérifiez la connexion API.
+                        </td>
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
             </div>
@@ -366,37 +384,48 @@ function NewsItem({ initials, color, title, time, content }: any) {
   );
 }
 
-function TableRow({ 
-  icon, color, bg, title, subtitle, price, change, status, 
-  trendColor, trendPath = "M0,25 C10,25 20,20 30,22 C40,24 50,15 60,10 C70,5 80,8 100,2",
-  statusColor = "text-secondary bg-secondary/10 border-secondary/20",
-  changeColor = "text-secondary"
-}: any) {
+function PriceRow({ price, formatPrice }: { price: GoldPrice; formatPrice: (price: number) => string }) {
+  const karatConfig: Record<number, any> = {
+    18: { icon: Hammer, color: 'text-yellow-500', bg: 'bg-yellow-900/30', title: 'Or Cassé (Local)', subtitle: '18 Carats - Occasion' },
+    21: { icon: Crown, color: 'text-orange-400', bg: 'bg-orange-900/30', title: 'Local (Algérien)', subtitle: '21 Carats - Artisanal' },
+    22: { icon: Coins, color: 'text-purple-400', bg: 'bg-purple-900/30', title: 'Louis d\'Or', subtitle: '22 Carats - Pièce' },
+    24: { icon: PiggyBank, color: 'text-amber-500', bg: 'bg-amber-900/30', title: 'Lingot (Bullion)', subtitle: '24 Carats - Brut' },
+  };
+
+  const config = karatConfig[price.karat] || karatConfig[18];
+  const Icon = config.icon;
+  
+  const changeColor = price.change_24h >= 0 ? 'text-secondary' : 'text-danger';
+  const statusColor = price.change_24h >= 0 ? 'text-secondary bg-secondary/10 border-secondary/20' : 'text-danger bg-danger/10 border-danger/20';
+  const statusText = price.change_24h >= 0 ? 'Haussier' : 'Baisse';
+
   return (
     <tr className="hover:bg-background-light dark:hover:bg-white/5 transition-colors group">
       <td className="p-4">
         <div className="flex items-center gap-3">
-          <div className={`p-2 ${bg} ${color} rounded-lg`}>
-            {icon}
+          <div className={`p-2 ${config.bg} ${config.color} rounded-lg`}>
+            <Icon className="text-lg w-5 h-5" />
           </div>
           <div>
-            <div className="font-semibold text-gray-900 dark:text-gray-100">{title}</div>
-            <div className="text-xs text-text-muted-light dark:text-text-muted-dark">{subtitle}</div>
+            <div className="font-semibold text-gray-900 dark:text-gray-100">{config.title}</div>
+            <div className="text-xs text-text-muted-light dark:text-text-muted-dark">{config.subtitle}</div>
           </div>
         </div>
       </td>
-      <td className="p-4 text-right font-mono font-bold text-gray-900 dark:text-white text-lg">{price}</td>
+      <td className="p-4 text-right font-mono font-bold text-gray-900 dark:text-white text-lg">
+        {formatPrice(price.current_price)}
+      </td>
       <td className="p-4 text-center">
-        <div className="w-24 h-8 mx-auto">
-          <svg className={`w-full h-full ${trendColor} fill-none stroke-2`} viewBox="0 0 100 30">
-            <path d={trendPath}></path>
-          </svg>
+        <div className={`text-sm font-mono font-medium ${price.change_24h >= 0 ? 'text-secondary' : 'text-danger'}`}>
+          {price.change_24h >= 0 ? '+' : ''}{formatPrice(price.change_24h)}
         </div>
       </td>
-      <td className={`p-4 text-right font-mono ${changeColor} font-medium`}>{change}</td>
+      <td className={`p-4 text-right font-mono ${changeColor} font-medium`}>
+        {price.change_percent >= 0 ? '+' : ''}{price.change_percent.toFixed(2)}%
+      </td>
       <td className="p-4 text-center">
         <span className={`px-2 py-1 rounded text-xs font-medium border ${statusColor}`}>
-          {status}
+          {statusText}
         </span>
       </td>
     </tr>
