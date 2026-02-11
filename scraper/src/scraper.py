@@ -11,8 +11,9 @@ from datetime import datetime
 from typing import Optional, Dict, List
 from dataclasses import dataclass
 
-from telethon import TelegramClient
+from telethon import TelegramClient, events
 from telethon.tl.types import Message, MessageMediaPhoto
+import asyncpg
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -29,11 +30,12 @@ logger = logging.getLogger(__name__)
 API_ID = os.getenv('TELEGRAM_API_ID')
 API_HASH = os.getenv('TELEGRAM_API_HASH')
 PHONE = os.getenv('TELEGRAM_PHONE')
+DATABASE_URL = os.getenv('DATABASE_URL')
 
 # Channels to monitor (add channel usernames here)
+# We monitor BijouterieChalabi specifically as requested
 CHANNELS = [
-    # 'channel_username_1',
-    # 'channel_username_2',
+    'BijouterieChalabi',
 ]
 
 @dataclass
@@ -147,6 +149,7 @@ class GoldScraper:
             API_HASH
         )
         self.parser = GoldPriceParser()
+        self.db_pool = None
     
     async def start(self):
         """Start the Telegram client"""
@@ -159,65 +162,63 @@ class GoldScraper:
         else:
             logger.info("Starting Telegram client with phone number")
             await self.client.start(phone=PHONE)
-        
-        logger.info("Telegram client started successfully")
+            
+        self.db_pool = await asyncpg.create_pool(DATABASE_URL)
+        logger.info("Telegram client & DB pool started successfully")
     
     async def stop(self):
         """Stop the Telegram client"""
         await self.client.disconnect()
+        if self.db_pool:
+            await self.db_pool.close()
         logger.info("Telegram client stopped")
     
-    async def scrape_channel(self, channel: str, limit: int = 100) -> List[GoldPrice]:
-        """Scrape messages from a channel"""
-        prices = []
-        
-        try:
-            async for message in self.client.iter_messages(channel, limit=limit):
-                if message.text:
-                    parsed = self.parser.parse_message(message.text, channel)
-                    prices.extend(parsed)
-                    
-                    if parsed:
-                        logger.info(f"Found {len(parsed)} prices in message {message.id}")
-        
-        except Exception as e:
-            logger.error(f"Error scraping channel {channel}: {e}")
-        
-        return prices
-    
-    async def scrape_all(self, limit: int = 50) -> List[GoldPrice]:
-        """Scrape all configured channels"""
-        all_prices = []
-        
-        for channel in CHANNELS:
-            logger.info(f"Scraping channel: {channel}")
-            prices = await self.scrape_channel(channel, limit)
-            all_prices.extend(prices)
+    async def save_price(self, price: GoldPrice):
+        """Save price to database"""
+        if not self.db_pool:
+            return
             
-            # Rate limiting
-            await asyncio.sleep(2)
-        
-        return all_prices
+        try:
+            async with self.db_pool.acquire() as conn:
+                await conn.execute("""
+                    INSERT INTO gold_prices (timestamp, karat, buy_price, sell_price, source, raw_text, gold_type)
+                    VALUES ($1, $2, $3, $4, $5, $6, 'new')
+                    ON CONFLICT (timestamp, karat, source) DO NOTHING
+                """, price.timestamp, price.karat, price.buy_price, price.sell_price, price.source, price.raw_text)
+                logger.info(f"Saved price: {price.karat}k - {price.buy_price} DZD")
+        except Exception as e:
+            logger.error(f"Error saving price: {e}")
+
+    def setup_handlers(self):
+        """Setup event handlers for new messages"""
+        @self.client.on(events.NewMessage(chats=CHANNELS))
+        async def handler(event):
+            if event.message.text:
+                logger.info(f"New message from {event.chat.username}")
+                prices = self.parser.parse_message(event.message.text, event.chat.username)
+                
+                if prices:
+                    logger.info(f"Found {len(prices)} prices")
+                    for price in prices:
+                        await self.save_price(price)
+                else:
+                    logger.info("No prices found in message")
 
 
 async def main():
     """Main entry point"""
     if not API_ID or not API_HASH:
         logger.error("Missing TELEGRAM_API_ID or TELEGRAM_API_HASH")
-        logger.info("Get your credentials at https://my.telegram.org/")
         return
     
     scraper = GoldScraper()
     
     try:
         await scraper.start()
+        scraper.setup_handlers()
         
-        # Scrape prices
-        prices = await scraper.scrape_all()
-        
-        logger.info(f"Total prices found: {len(prices)}")
-        for price in prices:
-            print(price.to_dict())
+        logger.info("Listening for new messages... (Press Ctrl+C to stop)")
+        await scraper.client.run_until_disconnected()
     
     finally:
         await scraper.stop()

@@ -1,0 +1,7 @@
+- [ ] T001 Update `scraper/requirements.txt` with `beautifulsoup4` and `lxml`.
+- [ ] T002 Implement `scraper/src/backfill.py` with pagination logic (Web Scraping).
+- [ ] T003 Refactor `scraper/src/scraper.py` to `scraper/src/live.py` (ensure it runs forever with Bot Token).
+- [ ] T004 Create `scraper/src/main.py` entrypoint to orchestrate modes.
+- [ ] T005 Docker: Rebuild scraper image with new dependencies.
+- [ ] T006 Deploy: Run backfill on VPS to populate history.
+- [ ] T007 Deploy: Start live listener.
