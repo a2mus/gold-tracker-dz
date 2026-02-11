@@ -56,6 +56,8 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/web:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://gold-tracker-dz.duckdns.org
 
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v1.0.3
