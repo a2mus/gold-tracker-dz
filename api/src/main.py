@@ -102,79 +102,108 @@ async def root():
 async def get_current_prices():
     """Get current prices for all karats"""
     
-    # Mock data for initial development
-    # TODO: Replace with database queries
-    now = datetime.utcnow()
+    if not db_pool:
+        raise HTTPException(status_code=503, detail="Database not available")
     
-    return [
-        PriceSummary(
-            karat=18,
-            current_price=29700,
-            change_24h=100,
-            change_percent=0.34,
-            high_24h=29800,
-            low_24h=29500,
-            last_updated=now
-        ),
-        PriceSummary(
-            karat=21,
-            current_price=34650,
-            change_24h=150,
-            change_percent=0.43,
-            high_24h=34800,
-            low_24h=34400,
-            last_updated=now
-        ),
-        PriceSummary(
-            karat=22,
-            current_price=36300,
-            change_24h=200,
-            change_percent=0.55,
-            high_24h=36500,
-            low_24h=36000,
-            last_updated=now
-        ),
-        PriceSummary(
-            karat=24,
-            current_price=39600,
-            change_24h=250,
-            change_percent=0.63,
-            high_24h=39800,
-            low_24h=39300,
-            last_updated=now
-        ),
-    ]
-
-
-@app.get("/api/v1/prices/history", response_model=List[GoldPriceResponse], tags=["Prices"])
-async def get_price_history(
-    karat: int = Query(18, description="Gold karat"),
-    days: int = Query(7, description="Number of days", ge=1, le=365)
-):
-    """Get historical prices for a specific karat"""
-    
-    # Mock data
-    # TODO: Replace with database queries
-    now = datetime.utcnow()
-    history = []
-    
-    base_prices = {18: 29700, 21: 34650, 22: 36300, 24: 39600}
-    base = base_prices.get(karat, 29700)
-    
-    for i in range(days * 4):  # 4 data points per day
-        timestamp = now - timedelta(hours=i * 6)
-        variation = (i % 10 - 5) * 50  # Simple variation
+    async with db_pool.acquire() as conn:
+        # Get latest prices from view
+        latest = await conn.fetch("""
+            SELECT karat, current_price, last_updated
+            FROM latest_gold_prices
+            ORDER BY karat
+        """)
         
-        history.append(GoldPriceResponse(
-            id=i,
-            timestamp=timestamp,
-            karat=karat,
-            buy_price=base + variation,
-            sell_price=base + variation + 200,
-            source="mock"
-        ))
+        if not latest:
+            # Return empty if no data
+            return []
+        
+        # Get 24h ago prices for comparison
+        yesterday = datetime.utcnow() - timedelta(hours=24)
+        
+        prices = []
+        for row in latest:
+            karat = row['karat']
+            current = float(row['current_price'])
+            last_updated = row['last_updated']
+            
+            # Get 24h stats
+            stats = await conn.fetchrow("""
+                SELECT 
+                    AVG((buy_price + sell_price) / 2) AS avg_24h,
+                    MIN((buy_price + sell_price) / 2) AS low_24h,
+                    MAX((buy_price + sell_price) / 2) AS high_24h
+                FROM gold_prices
+                WHERE karat = $1
+                  AND timestamp >= $2
+            """, karat, yesterday)
+            
+            avg_24h = float(stats['avg_24h'] or current)
+            low_24h = float(stats['low_24h'] or current)
+            high_24h = float(stats['high_24h'] or current)
+            
+            change_24h = current - avg_24h
+            change_percent = (change_24h / avg_24h * 100) if avg_24h > 0 else 0
+            
+            prices.append(PriceSummary(
+                karat=karat,
+                current_price=round(current, 2),
+                change_24h=round(change_24h, 2),
+                change_percent=round(change_percent, 2),
+                high_24h=round(high_24h, 2),
+                low_24h=round(low_24h, 2),
+                last_updated=last_updated
+            ))
+        
+        return prices
+
+
+@app.get("/api/v1/prices/history", response_model=List[dict], tags=["Prices"])
+async def get_price_history(
+    karat: Optional[int] = Query(None, description="Filter by gold karat"),
+    days: int = Query(30, description="Number of days", ge=1, le=365),
+    granularity: str = Query("daily", description="daily or hourly")
+):
+    """Get historical prices with daily or hourly granularity"""
     
-    return history
+    if not db_pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    async with db_pool.acquire() as conn:
+        if granularity == "hourly" and days <= 7:
+            # Use hourly data for last 7 days
+            view_name = "gold_prices_hourly"
+            date_col = "hour"
+        else:
+            # Use daily data for longer periods
+            view_name = "historical_gold_prices_daily"
+            date_col = "date"
+        
+        query = f"""
+            SELECT 
+                {date_col} AS timestamp,
+                karat,
+                avg_price,
+                data_points
+            FROM {view_name}
+            WHERE timestamp >= NOW() - INTERVAL '{days} days'
+        """
+        
+        if karat:
+            query += f" AND karat = {karat}"
+        
+        query += f" ORDER BY timestamp DESC, karat"
+        
+        rows = await conn.fetch(query)
+        
+        return [
+            {
+                "timestamp": row['timestamp'].isoformat(),
+                "karat": row['karat'],
+                "avg_price": float(row['avg_price']),
+                "data_points": row['data_points']
+            }
+            for row in rows
+        ]
 
 
 @app.get("/api/v1/prices/world", response_model=WorldPrice, tags=["Prices"])
