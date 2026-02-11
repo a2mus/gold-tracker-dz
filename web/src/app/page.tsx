@@ -59,8 +59,10 @@ export default function Dashboard() {
     // Fetch prices from API
     async function fetchPrices() {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-        const response = await fetch(`${apiUrl}/api/v1/prices/current`);
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        // Remove trailing slash and append API path
+        const apiUrl = baseUrl.replace(/\/$/, '') + '/api/v1/prices/current';
+        const response = await fetch(apiUrl);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
