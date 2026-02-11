@@ -68,23 +68,23 @@ jobs:
           port: 22
           script: |
             cd ~/production/gold-tracker-dz
-            
+
             # Pull latest images
             docker compose pull
-            
+
             # Restart services
             docker compose up -d --remove-orphans
-            
+
             # Cleanup old images
             docker image prune -f
-            
+
             echo "✅ Gold Tracker deployed successfully!"
 
   notify:
     needs: build-and-deploy
     runs-on: ubuntu-latest
     if: always()
-    
+
     steps:
       - name: Send Telegram notification
         uses: appleboy/telegram-action@master
@@ -97,5 +97,5 @@ jobs:
             Status: ${{ needs.build-and-deploy.result == 'success' && '✅ Success' || '❌ Failed' }}
             Commit: ${{ github.sha }}
             Branch: ${{ github.ref_name }}
-            
-            https://gold.nexus-dz.com
+
+            https://gold-tracker-dz.duckdns.org

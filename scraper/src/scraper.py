@@ -150,7 +150,16 @@ class GoldScraper:
     
     async def start(self):
         """Start the Telegram client"""
-        await self.client.start(phone=PHONE)
+        # Check if using bot token or phone number
+        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+        
+        if bot_token:
+            logger.info("Starting Telegram client with bot token")
+            await self.client.start(bot_token=bot_token)
+        else:
+            logger.info("Starting Telegram client with phone number")
+            await self.client.start(phone=PHONE)
+        
         logger.info("Telegram client started successfully")
     
     async def stop(self):
