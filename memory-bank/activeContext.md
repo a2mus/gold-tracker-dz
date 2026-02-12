@@ -1,15 +1,19 @@
 # Active Context
 
-> Current focus: Robust Scraper & Historical Data
+> Current focus: Production Deployment Pipeline
 
 ## Current Focus
-Rebuilding the scraper architecture to be resilient and capable of backfilling historical data. We are moving away from ad-hoc fixes to a specified, engineered solution.
+Establishing a robust CI/CD pipeline using GitHub Actions to build Docker images, push to GHCR, and deploy to the VPS.
 
 ## Recent Changes
 - Activated Speckit Protocol.
-- Created Constitution.
-- Initialized SDD structure.
+- Configured GitHub Actions workflow `deploy.yml`.
+- Created production docker-compose configuration.
 
 ## Open Questions
-- How to robustly handle Telegram auth (User vs Bot) in a headless container?
-- Best strategy for historical backfill (Web preview parsing vs Telethon history)?
+- GHCR image visibility (Private vs Public) - need to ensure VPS can pull.
+- Database backups - need a strategy for TimescaleDB data persistence.
+
+## Next Steps
+- Verify `deploy.yml` correctly transfers the production compose file.
+- Push changes to GitHub to trigger the first full deployment.
