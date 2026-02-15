@@ -54,7 +54,9 @@ async def main():
             return
         logger.info("Using phone number for authentication")
     
-    client = TelegramClient('historical_session', API_ID, API_HASH)
+    # Ensure session is stored in the persistent volume directory
+    session_path = os.path.join('sessions', 'historical_session')
+    client = TelegramClient(session_path, API_ID, API_HASH)
     
     if use_bot:
         await client.start(bot_token=BOT_TOKEN)

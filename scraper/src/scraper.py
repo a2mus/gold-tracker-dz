@@ -143,8 +143,10 @@ class GoldScraper:
     """Main scraper class for Telegram channels"""
     
     def __init__(self):
+        # Store session in the persistent volume directory
+        session_path = os.path.join('sessions', 'gold_scraper_session')
         self.client = TelegramClient(
-            'gold_scraper_session',
+            session_path,
             API_ID,
             API_HASH
         )
