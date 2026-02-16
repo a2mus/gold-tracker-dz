@@ -100,10 +100,13 @@ async def main():
     client = await get_client()
     
     print(f"Scraping {TELEGRAM_CHANNEL}...")
-    prices = await scrape_latest_prices(client, limit=10)
+    prices = await scrape_latest_prices(client, limit=5)
     
-    for p in prices:
-        print(f"{p['date']}: {p['prices']}")
+    if not prices:
+        print("No gold prices found in the latest 5 messages.")
+    else:
+        for p in prices:
+            print(f"[{p['date']}] Source: {p['source']} | Prices: {p['prices']}")
     
     await client.disconnect()
 

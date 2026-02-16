@@ -3,7 +3,7 @@ telethon==1.34.0
 python-dotenv==1.0.0
 
 # OCR for image-based prices
-paddlepaddle==2.6.0
+paddlepaddle>=2.6.2
 paddleocr==2.7.3
 
 # API
