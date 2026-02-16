@@ -11,14 +11,15 @@ ocr = PaddleOCR(use_angle_cls=True, lang='ar')
 
 # Price patterns for different karat levels
 KARAT_PATTERNS = {
-    '24k': [r'24\s*[kK]', r'24\s*قيراط', r'ذهب\s*24'],
-    '22k': [r'22\s*[kK]', r'22\s*قيراط', r'ذهب\s*22'],
-    '21k': [r'21\s*[kK]', r'21\s*قيراط', r'ذهب\s*21'],
-    '18k': [r'18\s*[kK]', r'18\s*قيراط', r'ذهب\s*18'],
+    '24k': [r'24\s*[kK]', r'24\s*قيراط', r'ذهب\s*24', r'999'],
+    '22k': [r'22\s*[kK]', r'22\s*قيراط', r'ذهب\s*22', r'916'],
+    '21k': [r'21\s*[kK]', r'21\s*قيراط', r'ذهب\s*21', r'875'],
+    '18k': [r'18\s*[kK]', r'18\s*قيراط', r'ذهب\s*18', r'750'],
 }
 
-# Price number pattern (handles Arabic numerals and commas)
-PRICE_PATTERN = r'[\d\u0660-\u0669,.\s]+(?:\s*(?:دج|DA|DZD))?'
+# Price number pattern - strict 3-6 digits only (realistic gold price range in DZD)
+# Only match actual digits, not commas/dots that can create false matches
+PRICE_PATTERN = r'(?:جد|دج|DA|DZD)?[\d\u0660-\u0669]{3,6}(?:دج|DA|DZD)?'
 
 
 def arabic_to_int(text: str) -> Optional[int]:
@@ -50,21 +51,7 @@ def extract_prices_from_image(image_path: str) -> dict:
     
     # Combine all detected text
     full_text = ' '.join([line[1][0] for line in result[0]])
-    
-    prices = {}
-    
-    # Try to find prices for each karat level
-    for karat, patterns in KARAT_PATTERNS.items():
-        for pattern in patterns:
-            match = re.search(f'({pattern})\\s*[:=]?\\s*({PRICE_PATTERN})', full_text, re.IGNORECASE)
-            if match:
-                price_text = match.group(2)
-                price = arabic_to_int(price_text)
-                if price and price > 1000:  # Sanity check (gold > 1000 DZD/g)
-                    prices[karat] = price
-                    break
-    
-    return prices
+    return extract_prices_from_text(full_text)
 
 
 def extract_prices_from_text(text: str) -> dict:
@@ -73,13 +60,20 @@ def extract_prices_from_text(text: str) -> dict:
     """
     prices = {}
     
+    # Clean text: replace multiple spaces/newlines with single space
+    text = re.sub(r'\s+', ' ', text)
+    
     for karat, patterns in KARAT_PATTERNS.items():
         for pattern in patterns:
-            match = re.search(f'({pattern})\\s*[:=]?\\s*({PRICE_PATTERN})', text, re.IGNORECASE)
+            # Allow common separators like ":", "=", "يبدأ من", "بـ", "سعر", "السعر", etc.
+            # and common OCR misreads of these.
+            separator = r'(?:\s*[:=]\s*|\s+يبدأ\s+من\s+|\s+من\s+|\s+بـ\s+|\s+السعر\s+|\s+سعر\s+|\s+)'
+            match = re.search(f'({pattern}){separator}({PRICE_PATTERN})', text, re.IGNORECASE)
             if match:
                 price_text = match.group(2)
                 price = arabic_to_int(price_text)
-                if price and price > 1000:
+                # Sanity check: Price must be between 1,000 and 100,000 DZD
+                if price and 1000 < price < 100000:
                     prices[karat] = price
                     break
     
